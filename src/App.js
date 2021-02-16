@@ -1,7 +1,7 @@
 /* src/App.js */
 import React, { useEffect, useState } from 'react'
 import Amplify, { API, graphqlOperation } from 'aws-amplify'
-import { createTodo, deleteTodo } from './graphql/mutations'
+import { createTodo, deleteTodo, updateTodo } from './graphql/mutations'
 import { listTodos } from './graphql/queries'
 
 import { withAuthenticator } from '@aws-amplify/ui-react'
@@ -13,6 +13,7 @@ const initialState = { name: '', description: '' }
 
 const App = () => {
   const [formState, setFormState] = useState(initialState)
+  const [editMode, setEditMode] = useState(false)
   const [todos, setTodos] = useState([])
 
   useEffect(() => {
@@ -31,13 +32,20 @@ const App = () => {
     } catch (err) { console.log('error fetching todos') }
   }
 
-  async function addTodo() {
+  async function saveTodo() {
     try {
       if (!formState.name || !formState.description) return
       const todo = { ...formState }
-      setTodos([...todos, todo])
-      setFormState(initialState)
-      await API.graphql(graphqlOperation(createTodo, {input: todo}))
+      if (editMode) {
+        setEditMode(false)
+        setFormState(initialState)
+        await API.graphql(graphqlOperation(updateTodo, {input: {...todo}}))
+        fetchTodos()
+      } else {
+        setTodos([...todos, todo])
+        setFormState(initialState)
+        await API.graphql(graphqlOperation(createTodo, {input: todo}))
+      }
     } catch (err) {
       console.log('error creating todo:', err)
     }
@@ -50,6 +58,12 @@ const App = () => {
     } catch (err) {
       console.log('error creating todo:', err)
     }
+  }
+
+ function editTodo(todo) {
+   const todoInfo = {id: todo.id, name: todo.name, description: todo.description}
+      setFormState({...todoInfo})
+      setEditMode(true)
   }
 
   return (
@@ -67,12 +81,13 @@ const App = () => {
         value={formState.description}
         placeholder="Description"
       />
-      <button style={styles.button} onClick={addTodo}>Create Todo</button>
+      <button style={styles.button} onClick={saveTodo}>{ editMode ? 'Edit Todo' : 'Create Todo'}</button>
       {
         todos.map((todo, index) => (
           <div key={todo.id ? todo.id : index} style={styles.todo}>
             <p style={styles.todoName}>{todo.name}</p>
             <p style={styles.todoDescription}>{todo.description}</p>
+          <button style={styles.button} onClick={() => {editTodo(todo)}}>Edit</button>
           <button style={styles.button} onClick={() => {removeTodo(todo.id)}}>Done</button>
 
           </div>
